@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打印机状态灯</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; margin: 0; padding: 16px; background-color: #f0f2f5; font-size: 14px; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .card { background-color: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 16px; }
+        h1 { font-size: 22px; text-align: center; color: #111; margin-bottom: 20px; }
+        h2 { font-size: 18px; color: #333; margin: 20px 0 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        label { display: block; margin: 12px 0 5px; color: #555; font-weight: 500; }
+        input[type='text'], input[type='number'], select { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 14px; transition: border-color 0.2s; }
+        input[type='text']:focus, input[type='number']:focus, select:focus { border-color: #007aff; outline: none; }
+        input[type='color'] { min-width: 40px; height: 40px; border-radius: 8px; border: 1px solid #ccc; padding: 0; margin-right: 8px; vertical-align: middle; cursor: pointer; }
+        input[type='checkbox'] { width: auto; margin-right: 8px; vertical-align: middle; }
+        button { background-color: #007aff; color: white; padding: 12px 18px; border: none; border-radius: 8px; cursor: pointer; width: 100%; margin-bottom: 10px; font-size: 15px; font-weight: 500; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .mode-group { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+        .log-container { border: 1px solid #ddd; border-radius: 8px; padding: 12px; height: 200px; overflow-y: auto; background-color: #f8f9fa; font-family: monospace; font-size: 12px; white-space: pre-wrap; margin-top: 10px; }
+        #status, #printer-status { background-color: #e9ecef; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: 500; line-height: 1.6; }
+        .color-picker-group { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .color-picker-group input[type='text'] { flex-grow: 1; margin-bottom: 0; }
+        .loading { color: #888; font-style: italic; }
+        @media (max-width: 600px) { .container { padding: 8px; } .card { padding: 15px; } .button-group { grid-template-columns: 1fr; } .mode-group { flex-direction: column; align-items: stretch; } }
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='card'>
+            <h1>打印机状态灯</h1>
+            <div id='status' class='loading'>正在加载设备状态...</div>
+            <div id='printer-status' class='loading'>打印机状态: 正在加载...</div>
+            <form id='configForm' onsubmit='submitForm(event)'>
+                <h2>配置</h2>
+                <label for='uid'>用户 ID</label>
+                <input type='text' id='uid' name='uid' required>
+                
+                <label for='accessToken'>访问令牌</label>
+                <input type='text' id='accessToken' name='accessToken' maxlength='256' required>
+                
+                <label for='deviceID'>设备序列号</label>
+                <input type='text' id='deviceID' name='deviceID' required>
+                
+                <label for='brightness'>全局亮度 (0-255)</label>
+                <input type='number' id='brightness' name='globalBrightness' min='0' max='255' value='255' required>
+                
+                <label for='standbyMode'>待机模式</label>
+                <select id='standbyMode' name='standbyMode'>
+                    <option value='marquee'>彩虹跑马灯</option>
+                    <option value='breathing'>呼吸灯</option>
+                </select>
+                
+                <label for='progressBarColor'>进度条颜色</label>
+                <div class='color-picker-group'>
+                    <input type='color' id='progressBarColorPicker' value='#FFFFFF'>
+                    <input type='text' id='progressBarColor' name='progressBarColor' value='#FFFFFF' pattern='#?[0-9A-Fa-f]{6}' required>
+                </div>
+                
+                <label for='standbyBreathingColor'>待机呼吸灯颜色</label>
+                <div class='color-picker-group'>
+                    <input type='color' id='standbyBreathingColorPicker' value='#FFFFFF'>
+                    <input type='text' id='standbyBreathingColor' name='standbyBreathingColor' value='#FFFFFF' pattern='#?[0-9A-Fa-f]{6}' required>
+                </div>
+
+                <label for='progressBarBrightnessRatio'>进度条亮度比例 (0.0-1.0)</label>
+                <input type='number' id='progressBarBrightnessRatio' name='progressBarBrightnessRatio' min='0' max='1' step='0.1' value='1.0' required>
+                
+                <label for='standbyBrightnessRatio'>待机亮度比例 (0.0-1.0)</label>
+                <input type='number' id='standbyBrightnessRatio' name='standbyBrightnessRatio' min='0' max='1' step='0.1' value='1.0' required>
+
+                <label for='customPushallInterval'>状态请求间隔 (秒)</label>
+                <input type='number' id='customPushallInterval' name='customPushallInterval' min='10' max='600' value='10' required>
+                
+                <label><input type='checkbox' id='overlayMarquee' name='overlayMarquee'> 在进度条上叠加跑马灯</label>
+                
+                <button type='submit'>保存配置</button>
+            </form>
+        </div>
+
+        <div class='card'>
+            <h2>操作</h2>
+            <div class='button-group'>
+                <button onclick='testLed()'>测试 LED</button>
+                <button onclick='clearCache()'>清除缓存</button>
+                <button onclick='resetConfig()'>重置配置</button>
+                <button onclick='restart()'>重启设备</button>
+            </div>
+            <div class='mode-group'>
+                <select id='switchModeSelect' name='mode'>
+                    <option value='none'>自动模式</option>
+                    <option value='progress'>强制进度条</option>
+                    <option value='standby'>强制待机</option>
+                </select>
+                <button onclick='switchMode()'>切换模式</button>
+            </div>
+        </div>
+
+        <div class='card'>
+            <h2>日志</h2>
+            <div class='log-container loading' id='log'>正在加载日志...</div>
+        </div>
+    </div>
+
+    <script>
+        function showMsg(msg, isError = false) {
+            alert(isError ? `错误: ${msg}` : msg);
+        }
+
+        function submitForm(event) {
+            event.preventDefault();
+            const form = document.getElementById('configForm');
+            if (!form.checkValidity()) {
+                showMsg('请检查表单中的错误！', true);
+                form.reportValidity();
+                return;
+            }
+            const formData = new FormData(form);
+            // 转换颜色格式（移除 # 前缀）
+            const progressColor = formData.get('progressBarColor').replace(/^#/, '');
+            const standbyColor = formData.get('standbyBreathingColor').replace(/^#/, '');
+            formData.set('progressBarColor', progressColor);
+            formData.set('standbyBreathingColor', standbyColor);
+            // 转换为毫秒
+            formData.set('customPushallInterval', parseInt(formData.get('customPushallInterval')) * 1000);
+            fetch('/config', { 
+                method: 'POST', 
+                body: new URLSearchParams(formData),
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            })
+                .then(r => r.ok ? r.text() : r.text().then(t => { throw new Error(t); }))
+                .then(text => {
+                    showMsg(text || '配置已保存！设备将重启。');
+                    setTimeout(() => window.location.reload(), 2000);
+                })
+                .catch(e => showMsg(`保存失败: ${e.message}`, true));
+        }
+
+        function sendPost(url, successMsg, errorMsg) {
+            if (url.includes('reset') || url.includes('restart')) {
+                if (!confirm('您确定要执行此操作吗？')) return;
+            }
+            fetch(url, { method: 'POST' })
+                .then(r => r.ok ? r.text() : r.text().then(t => { throw new Error(t); }))
+                .then(text => showMsg(text || successMsg))
+                .catch(e => showMsg(`${errorMsg}: ${e.message}`, true));
+        }
+
+        function testLed() { sendPost('/testLed', 'LED 测试已启动！', '测试失败'); }
+        function clearCache() { sendPost('/clearCache', '缓存已清除！', '清除失败'); }
+        function resetConfig() { sendPost('/reset', '配置已重置！设备正在重启。', '重置失败'); }
+        function restart() { sendPost('/restart', '设备正在重启...', '重启失败'); }
+
+        function switchMode() {
+            const select = document.getElementById('switchModeSelect');
+            if (!select) {
+                showMsg('未找到模式选择器！', true);
+                return;
+            }
+            const mode = select.value;
+            const name = { progress: '强制进度条', standby: '强制待机', none: '自动模式' }[mode];
+            fetch('/switchMode', { 
+                method: 'POST', 
+                body: new URLSearchParams({ mode }),
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            })
+                .then(r => r.ok ? r.text() : r.text().then(t => { throw new Error(t); }))
+                .then(text => showMsg(text || `已切换到 ${name}`))
+                .catch(e => showMsg(`切换失败: ${e.message}`, true));
+        }
+
+        function fetchLog() {
+            fetch('/log')
+                .then(r => r.ok ? r.text() : Promise.reject('无法加载日志'))
+                .then(data => {
+                    const log = document.getElementById('log');
+                    if (log) {
+                        log.textContent = data || '暂无日志';
+                        log.classList.remove('loading');
+                        log.scrollTop = log.scrollHeight;
+                    }
+                })
+                .catch(e => {
+                    const log = document.getElementById('log');
+                    if (log) {
+                        log.textContent = `日志加载错误: ${e}`;
+                        log.classList.remove('loading');
+                    }
+                });
+        }
+
+        function formatTime(s) {
+            if (!s || s <= 0) return 'N/A';
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = s % 60;
+            return h > 0 ? `${h}小时 ${m}分 ${sec}秒` : `${m}分 ${sec}秒`;
+        }
+
+        function fetchStatus() {
+            fetch('/status')
+                .then(r => r.ok ? r.json() : Promise.reject('无法加载状态'))
+                .then(d => {
+                    const statusDiv = document.getElementById('status');
+                    const printerDiv = document.getElementById('printer-status');
+                    const select = document.getElementById('switchModeSelect');
+                    if (statusDiv && printerDiv && select) {
+                        statusDiv.textContent = `设备状态: ${d.status_text || '未知'} | 强制模式: ${d.forced_mode || '无'}`;
+                        statusDiv.classList.remove('loading');
+                        select.value = d.forced_mode === '强制进度条' ? 'progress' : d.forced_mode === '强制待机' ? 'standby' : 'none';
+                        printerDiv.innerHTML = `
+                            <b>打印机状态:</b> ${d.gcode_state || '未知'}<br>
+                            <b>进度:</b> ${d.print_percent || 0}%<br>
+                            <b>剩余时间:</b> ${formatTime(d.remaining_time)}<br>
+                            <b>喷嘴温度:</b> ${d.nozzle_temper || 0}°C | 
+                            <b>热床温度:</b> ${d.bed_temper || 0}°C | 
+                            <b>腔体温度:</b> ${d.chamber_temper || 0}°C<br>
+                            <b>层数:</b> ${d.layer_num || 0} / ${d.total_layer_num || 0}<br>
+                            <b>WiFi 信号:</b> ${d.wifi_signal || '0dBm'} | 
+                            <b>速度等级:</b> ${d.spd_lvl || 2}
+                        `;
+                        printerDiv.classList.remove('loading');
+                    }
+                })
+                .catch(e => {
+                    const statusDiv = document.getElementById('status');
+                    if (statusDiv) {
+                        statusDiv.textContent = `状态加载错误: ${e}`;
+                        statusDiv.classList.remove('loading');
+                    }
+                });
+        }
+
+        function fetchConfig() {
+            fetch('/getConfig')
+                .then(r => r.ok ? r.json() : Promise.reject('无法加载配置'))
+                .then(d => {
+                    document.getElementById('uid').value = d.uid || '';
+                    document.getElementById('accessToken').value = d.accessToken || '';
+                    document.getElementById('deviceID').value = d.deviceID || '';
+                    document.getElementById('brightness').value = d.globalBrightness || 255;
+                    document.getElementById('standbyMode').value = d.standbyMode || 'breathing';
+                    const progressColor = `#${d.progressBarColor.toString(16).padStart(6, '0').toUpperCase()}`;
+                    document.getElementById('progressBarColor').value = progressColor;
+                    document.getElementById('progressBarColorPicker').value = progressColor;
+                    const standbyColor = `#${d.standbyBreathingColor.toString(16).padStart(6, '0').toUpperCase()}`;
+                    document.getElementById('standbyBreathingColor').value = standbyColor;
+                    document.getElementById('standbyBreathingColorPicker').value = standbyColor;
+                    document.getElementById('progressBarBrightnessRatio').value = d.progressBarBrightnessRatio || 1.0;
+                    document.getElementById('standbyBrightnessRatio').value = d.standbyBrightnessRatio || 1.0;
+                    document.getElementById('customPushallInterval').value = (d.customPushallInterval / 1000) || 10;
+                    document.getElementById('overlayMarquee').checked = d.overlayMarquee || false;
+                })
+                .catch(e => showMsg(`配置加载失败: ${e}`, true));
+        }
+
+        function setupColorSync(pickerId, textId) {
+            const picker = document.getElementById(pickerId);
+            const text = document.getElementById(textId);
+            if (picker && text) {
+                picker.addEventListener('input', () => { 
+                    text.value = picker.value.toUpperCase(); 
+                });
+                text.addEventListener('input', () => {
+                    let v = text.value.toUpperCase();
+                    if (/^#?[0-9A-F]{6}$/.test(v)) {
+                        if (!v.startsWith('#')) v = '#' + v;
+                        picker.value = v;
+                        text.value = v;
+                    }
+                });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchConfig();
+            fetchStatus();
+            fetchLog();
+            setInterval(fetchStatus, 5000);
+            setInterval(fetchLog, 10000);
+            setupColorSync('progressBarColorPicker', 'progressBarColor');
+            setupColorSync('standbyBreathingColorPicker', 'standbyBreathingColor');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+    "uid": "your_uid",
+    "accessToken": "your_access_token",
+    "deviceID": "your_device_id",
+    "brightness": 50,
+    "standbyMode": "marquee",
+    "overlayMarquee": false,
+    "progressBarColor": 1004007,
+    "standbyBreathingColor": 4868684,
+    "progressBarBrightnessRatio": 1.0,
+    "standbyBrightnessRatio": 1.0,
+    "customPushallInterval": 10
+  }
